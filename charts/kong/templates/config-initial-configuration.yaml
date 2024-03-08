@@ -1,0 +1,17 @@
+{{- if .Values.deployment.kong.enabled }}
+{{- if (and .Values.initialConfiguration.enabled (not (eq .Values.env.database "off"))) }}
+{{- if not (or .Values.initialConfiguration.configMap .Values.initialConfiguration.secret) }}
+{{- if .Values.initialConfiguration.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "kong.initialConfiguration.fullname" . }}
+  namespace: {{ template "kong.namespace" . }}
+  labels:
+    {{- include "kong.metaLabels" . | nindent 4 }}
+data:
+  kong.yml: | {{- .Values.initialConfiguration.config | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

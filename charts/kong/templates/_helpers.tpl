@@ -53,6 +53,14 @@ app.kubernetes.io/instance: "{{ .Release.Name }}"
 {{- end -}}
 
 {{/*
+PrivateAim - InitialConfiguration
+*/}}
+{{- define "kong.initialConfiguration.fullname" -}}
+{{- $name := default "kong-custom-init-config" .Values.initialConfiguration.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "kong.serviceAccountName" -}}
@@ -691,6 +699,28 @@ The name of the Service which will be used by the controller to update the Ingre
   {{- end }}
 {{- end }}
 
+{{/*
+PrivateAim - InitialConfiguration
+*/}}
+{{- if (and .Values.initialConfiguration.enabled (not (eq .Values.env.database "off"))) }}
+  {{- $initConfigSourceCount := (add (.Values.initialConfiguration.configMap | len | min 1) (.Values.initialConfiguration.secret | len | min 1) (.Values.initialConfiguration.config | len | min 1)) -}}
+  {{- if gt $initConfigSourceCount 1 -}}
+    {{- fail "Ambiguous configuration: only one of of .Values.initialConfiguration.configMap, .Values.initialConfiguration.secret, and .Values.initialConfiguration.config can be set." -}}
+  {{- else if eq $initConfigSourceCount 1 }}
+- name: kong-custom-init-config-volume
+    {{- if .Values.initialConfiguration.configMap }}
+  configMap:
+    name: {{ .Values.initialConfiguration.configMap }}
+    {{- else if .Values.initialConfiguration.secret }}
+  secret:
+    secretName: {{ .Values.initialConfiguration.secret }}
+    {{- else }}
+  configMap:
+    name: {{ template "kong.initialConfiguration.fullname" . }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{- if and .Values.ingressController.enabled .Values.ingressController.admissionWebhook.enabled }}
 - name: webhook-cert
   secret:
@@ -773,6 +803,16 @@ The name of the Service which will be used by the controller to update the Ingre
   mountPath: /kong_dbless/
     {{- end }}
   {{- end }}
+{{/*
+PrivateAim - InitialConfiguration
+*/}}
+{{- $initConfigSourceCount := (add (.Values.initialConfiguration.configMap | len | min 1) (.Values.initialConfiguration.secret | len | min 1) (.Values.initialConfiguration.config | len | min 1)) -}}
+  {{- if eq $initConfigSourceCount 1 -}}
+    {{- if (and .Values.initialConfiguration.enabled (not (eq .Values.env.database "off"))) }}
+- name: kong-custom-init-config-volume
+  mountPath: /kong_init_config/
+    {{- end }}
+  {{- end }}  
 {{- if or $.Values.admin.tls.client.caBundle $.Values.admin.tls.client.secretName }}
 - name: admin-client-ca
   mountPath: /etc/admin-client-ca/
